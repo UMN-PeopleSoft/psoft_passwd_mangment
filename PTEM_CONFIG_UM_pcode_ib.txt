@@ -1,0 +1,163 @@
+
+/* Custom ACM Template to update passwords on any nodes used in a unified navigation setup */
+import PT_PC_UTIL:StringMap;
+import PT_IB_NODE:NodeDefinition;
+import PTEM_CONFIG:EMConfigurationPlugin;
+import PTEM_CONFIG:PTEMHelpMessage;
+import PTEM_CONFIG:PTEMVariableProperty;
+
+class UMIBConfigureNode extends PTEM_CONFIG:EMConfigurationPlugin
+   method getPluginHelpMessage() Returns PTEM_CONFIG:PTEMHelpMessage;
+   method getProperties() Returns array of PTEM_CONFIG:PTEMVariableProperty;
+   
+   method validateVariables(&variables As PT_PC_UTIL:StringMap, &plugin As string) Returns array of PTEM_CONFIG:PTEMHelpMessage;;
+   method configureEnvironment(&variables As PT_PC_UTIL:StringMap, &plugin As string) Returns array of PTEM_CONFIG:PTEMHelpMessage;
+   method validateConfigurations(&variables As PT_PC_UTIL:StringMap, &plugin As string) Returns array of PTEM_CONFIG:PTEMHelpMessage;
+   method dependant_plugins() Returns array of string;
+   method getCurrentConfiguration(&variables As array of PT_PC_UTIL:StringMap, &plugin As string) Returns array of PT_PC_UTIL:StringMap;
+   method validateFunctionality(&variables As PT_PC_UTIL:StringMap, &plugin As string, &hlpArray As array of PTEM_CONFIG:PTEMHelpMessage) Returns boolean;
+   method isInternalPlugin() Returns boolean;
+   
+end-class;
+
+method getPluginHelpMessage
+   /+ Returns PTEM_CONFIG:PTEMHelpMessage +/
+   /+ Extends/implements PTEM_CONFIG:EMConfigurationPlugin.getPluginHelpMessage +/
+   Local PTEM_CONFIG:PTEMHelpMessage &tempMessage = Null;
+   &tempMessage = create PTEM_CONFIG:PTEMHelpMessage(262, 1105, "Configure any node password", Null);
+   Return &tempMessage;
+end-method;
+
+
+method getProperties
+   /+ Returns Array of PTEM_CONFIG:PTEMVariableProperty +/
+   /+ Extends/implements PTEM_CONFIG:EMConfigurationPlugin.getProperties +/
+   
+   Local array of PTEM_CONFIG:PTEMVariableProperty &propArray = Null;
+   Local PTEM_CONFIG:PTEMVariableProperty &variableProperty = Null;
+   
+   
+   &variableProperty = create PTEM_CONFIG:PTEMVariableProperty("env.node", "string", True, False, "", 262, 1103, "Node to apply pwd changes", Null);
+   &propArray = CreateArray(&variableProperty);
+   
+   &variableProperty = create PTEM_CONFIG:PTEMVariableProperty("env.node_pass", "string", True, True, "", 262, 1116, "Node password", Null);
+   &propArray.Push(&variableProperty);
+   &variableProperty = create PTEM_CONFIG:PTEMVariableProperty("env.check_token_id", "string", False, True, "", 158, 99999, "Node CheckTokenId", Null);
+   &propArray.Push(&variableProperty);
+   
+   
+   Return &propArray;
+end-method;
+
+
+
+method configureEnvironment
+   /+ &variables as PT_PC_UTIL:StringMap, +/
+   /+ &plugin as String +/
+   /+ Returns Array of PTEM_CONFIG:PTEMHelpMessage +/
+   /+ Extends/implements PTEM_CONFIG:EMConfigurationPlugin.configureEnvironment +/
+   
+   If %This.hasAccess() = False Then
+      Return Null;
+   End-If;
+   
+   Local string &nodeName = &variables.get("env.node");
+   Local string &nodePassword = &variables.get("env.node_pass");
+   Local string &nodeCheckTokenId = &variables.get("env.check_token_id");
+   
+   Local Record &psVersion = CreateRecord(Record.PSVERSION);
+   Local boolean &doUpdateFlag;
+   
+   Local Record &psIBSvcSetup = CreateRecord(Record.PSIBSVCSETUP);
+   Local string &val;
+   
+   
+   Local PT_IB_NODE:NodeDefinition &nd = create PT_IB_NODE:NodeDefinition(&nodeName);
+   If All(&nodePassword) Then
+      &nd.IbPassword = &nodePassword;
+   End-If;
+   If All(&nodeCheckTokenId) Then
+      &nd.checkTokenID = &nodeCheckTokenId;
+   End-If;
+   Local boolean &bReturn = &nd.Save();
+   
+   &psVersion.OBJECTTYPENAME.Value = "MNDM";
+   &doUpdateFlag = &psVersion.SelectByKey();
+   &psVersion.VERSION.Value = &psVersion.VERSION.Value + 1;
+   If &doUpdateFlag Then
+      &psVersion.Update();
+   End-If;
+   &psVersion.OBJECTTYPENAME.Value = "SYS";
+   &doUpdateFlag = &psVersion.SelectByKey();
+   &psVersion.VERSION.Value = &psVersion.VERSION.Value + 1;
+   If &doUpdateFlag Then
+      &psVersion.Update();
+   End-If;
+   
+   Return Null;
+end-method;
+
+
+method validateConfigurations
+   /+ &variables as PT_PC_UTIL:StringMap, +/
+   /+ &plugin as String +/
+   /+ Returns Array of PTEM_CONFIG:PTEMHelpMessage +/
+   /+ Extends/implements PTEM_CONFIG:EMConfigurationPlugin.validateConfigurations +/
+   
+   If %This.hasAccess() = False Then
+      Return Null;
+   End-If;
+   
+   Local array of PTEM_CONFIG:PTEMHelpMessage &helpMsgArray = Null;
+   Local PTEM_CONFIG:PTEMHelpMessage &tempMessage;
+   &helpMsgArray = CreateArrayRept(&tempMessage, 0);
+   
+   Return &helpMsgArray;
+end-method;
+
+method validateVariables
+   /+ &variables as PT_PC_UTIL:StringMap, +/
+   /+ &plugin as String +/
+   /+ Returns Array of PTEM_CONFIG:PTEMHelpMessage +/
+   /+ Extends/implements PTEM_CONFIG:EMConfigurationPlugin.validateVariables +/
+   Return Null;
+end-method;
+
+method isInternalPlugin
+   /+ Returns Boolean +/
+   /+ Extends/implements PTEM_CONFIG:EMConfigurationPlugin.isInternalPlugin +/
+   Return False;
+end-method;
+
+method dependant_plugins
+   /+ Returns Array of String +/
+   /+ Extends/implements PTEM_CONFIG:EMConfigurationPlugin.dependant_plugins +/
+   Local array of string &dependant_array;
+   &dependant_array = CreateArray("");
+   Return &dependant_array;
+end-method;
+
+method getCurrentConfiguration
+   /+ &variables as Array of PT_PC_UTIL:StringMap, +/
+   /+ &plugin as String +/
+   /+ Returns Array of PT_PC_UTIL:StringMap +/
+   /+ Extends/implements PTEM_CONFIG:EMConfigurationPlugin.getCurrentConfiguration +/
+   Local integer &count = 1;
+   
+   &variables [&count] = create PT_PC_UTIL:StringMap();
+   
+   Return &variables;
+end-method;
+
+method validateFunctionality
+   /+ &variables as PT_PC_UTIL:StringMap, +/
+   /+ &plugin as String, +/
+   /+ &hlpArray as Array of PTEM_CONFIG:PTEMHelpMessage +/
+   /+ Returns Boolean +/
+   /+ Extends/implements PTEM_CONFIG:EMConfigurationPlugin.validateFunctionality +/
+   
+   Local boolean &ping_result = True;
+   
+   Return &ping_result;
+end-method;
+

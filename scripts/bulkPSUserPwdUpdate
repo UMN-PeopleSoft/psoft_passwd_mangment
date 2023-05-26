@@ -1,0 +1,149 @@
+#!/bin/env bash
+#
+################################################################################
+##
+## File Name   : bulkPSUserPwdUpdate
+## Description : Bulk Change the PS User Id's passwords for operations
+## Author      : Nate Werner
+## Created     : 04/25/2023
+################################################################################
+## Syntax      : bulkPSUserPwdUpdate -a <app> -e <env> -t <toolsVersion> -n <changer-toolsversion>
+##
+## Parameters  : -a <app>  : Optional, target app for password change
+##             : -e <env>  : Target env for password change
+##             : -t <toolsVersion> : Tools version to map to ansible variable
+##             : -n <toolsVer> : Use specific password by tools verion for changer user.
+##             :
+## Example     : bulkPSUserPwdUpdate -a cs -d dev -t 9.59.17
+##
+################################################################################
+
+## Update vault passwords first
+
+# load bootstrap dynamic path
+currentPath="$( cd "$(dirname "$0")" && pwd )"
+source ${currentPath%${currentPath#*scripts*/}}library/bootstrap.sh
+
+# load needed libraries
+source $LIB_HOME/inventory.sh
+source $LIB_HOME/utilities.sh
+source $LIB_HOME/security.sh
+
+app=""
+env=""
+toolsVersion=""
+useToolsVer=""
+
+## common functions
+function usageInfo()
+{
+   echo "Usage:"
+   echo "  bulkPSUserPwdUpdate -a <app> -e <env> -t <toolsVersion> -n <changer-toolsversion>"
+   echo "     Change a PeopleSoft UserId's password based on passwords in the vault"
+   echo "     This bulk process will update users:"
+   echo "     This process is determines which password to use based on the tools version"
+   echo "       If '-t 8.59' is used, it will lookup vault variable as 'psoft_pass.<user>.pt859.pass'"
+   echo "       If '-t 8.59.17' is used, it will lookup vault variable as 'psoft_pass.<user>.pt85917.pass'"
+   echo "     Parms:"
+   echo "     -a <app>  : (Optional) App"
+   echo "     -e <env>  : (Required) Env"
+   echo "     -t <toolsVer> : (Required) Major or Patch level version to use for ansible variable lookup"
+   echo "     -n <toolsVer> : Use specific password by tools verion for the "changer" user."
+   echo "     -h               : Display this help"
+   echo
+   echo "  If required to run multiple times, you may have updated changer's password, which is used to update other users,"
+   echo "    if so, run with the '-n' parameter, this will instruct process to use "new" password in the same"
+   echo "    tools patch version as being set for other tools, allowing to change other passwords after you've"
+   echo "    updated the changer user. This would also be used for emergency off-cycle password changes"
+   echo
+   echo "Sample: changeUserPassword.sh -a cs -e dev -t 8.59.17"
+   echo
+   exit
+
+}
+
+# get user's paramters
+while getopts ":ha:e:t:n:" optname; do
+    case "$optname" in
+      "a")
+        app=$OPTARG
+        ;;
+      "e")
+        env=$OPTARG
+        ;;
+      "t")
+        toolsVersion=$OPTARG
+        ;;
+      "n")
+        useToolsVer=$OPTARG
+        ;;
+      "h")
+        usageInfo
+        ;;
+      "?")
+        echo "Unknown option $OPTARG"
+        usageInfo
+        ;;
+      ":")
+        echo "No argument value for option $OPTARG"
+        usageInfo
+        ;;
+      *)
+      # Should not occur
+        echo "Unknown error while processing options"
+        ;;
+    esac
+done
+
+# Setup Vault access
+export ANSIBLE_LOG_PATH=/dev/null
+sec::getandStoreVaultAccess
+if [[ $? -ne 0 ]]; then
+  util::log "ERROR" "Unable to setup vault access"
+  exit 1
+fi
+
+# scrub the tools version of dots, if they exist
+toolsVersion="${toolsVersion//.}"
+
+# use changer's password based on the tools version used for the ansible variable
+if [ -n "$useToolsVer" ]; then
+  changer_tools="-t $useToolsVer"
+else
+  changer_tools=""
+fi
+if [ -n "$app" ]; then
+  useApp="-a $app"
+else
+  useApp=""
+fi
+
+# now dynamically lookup each password and run script
+sec::getGenSecurity "psoft_pass.apppoweruser.pt${toolsVersion}.pass" PS_USER_PWD
+export PS_USER_PWD
+$SCRIPT_HOME/utilities/changeUserPassword $useApp -e $env -u PS $changer_tools
+
+# All further passwords will need to use changer's new password based on the variable
+#   it was pointing to, based on the tools version specified
+sec::getGenSecurity "psoft_pass.ibadmin.pt${toolsVersion}.pass" PS_USER_PWD
+export PS_USER_PWD
+$SCRIPT_HOME/utilities/changeUserPassword $useApp -e $env -u IBADMIN -t ${toolsVersion}
+
+sec::getGenSecurity "psoft_pass.appbootuser.pt${toolsVersion}.pass" PS_USER_PWD
+export PS_USER_PWD
+$SCRIPT_HOME/utilities/changeUserPassword $useApp -e $env -u PSAPPSRV -t ${toolsVersion}
+
+sec::getGenSecurity "psoft_pass.webprofile.pt${toolsVersion}.pass" PS_USER_PWD
+export PS_USER_PWD
+$SCRIPT_HOME/utilities/changeUserPassword $useApp -e $env -u PTWEBSERVER -t ${toolsVersion}
+
+# public
+sec::getGenSecurity "psoft_guest.guest_cg.pt${toolsVersion}.pass" PS_USER_PWD
+export PS_USER_PWD
+$SCRIPT_HOME/utilities/changeUserPassword $useApp -e $env -u GUEST_CG -t ${toolsVersion}
+
+sec::getGenSecurity "psoft_guest.guest_supl.pt${toolsVersion}.pass" PS_USER_PWD
+export PS_USER_PWD
+$SCRIPT_HOME/utilities/changeUserPassword $useApp -e $env -u GUEST_SUPL -t ${toolsVersion}
+
+echo "Passwords updated for all users in $app $env"

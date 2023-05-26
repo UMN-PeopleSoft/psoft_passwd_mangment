@@ -1,0 +1,79 @@
+---
+# typically this would be encrypted with ansible-vault
+psoft_pass:  {
+   ibadmin: {
+      pt859: {
+        pass: "oldpass"
+      },
+      pt85917: {
+        pass: "newpass"
+      }
+   },
+   webadmin: {   # weblogic sysadm
+      pt859: {
+        pass: "oldpass"
+      }
+   },
+   ptwebserver: {
+      pt859: {
+        pass: "oldpass"
+      },
+      pt85917: {
+        pass: "newpass"
+      }
+   },
+   apppoweruser: {
+      pt859: {
+        pass: "oldpass"
+      },
+      pt85917: {
+        pass: "newpass"
+      }
+
+   },
+   appbootuser: {
+      pt859: {
+        pass: "oldpass"
+      },
+      pt85917: {
+        pass: "newpass"
+      }
+
+   },
+   appdomain: {   # domain connect password
+      pt859: {
+        pass: "oldpass"
+      },
+      pt85917: {
+        pass: "newpass"
+      }
+   },
+   connectDB: {
+      pt859: {
+        pass: "oldpass"
+      },
+      pt85915: {
+        pass: "newpass"
+      }
+
+   }
+}
+
+psoft_guest:  {
+   guest_cg: {
+      pt859: {
+        pass: "oldpass"
+      },
+      pt85917: {
+        pass: "newpass"
+      }
+   },
+   guest_supl: {
+      pt859: {
+        pass: "oldpass"
+      },
+      pt85917: {
+        pass: "newpass"
+      }
+   }
+}
